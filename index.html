@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhotoCompressor</title>
+
+<style>
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Arial,sans-serif;
+}
+
+body{
+  background:#0f0f0f;
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
+  padding:20px;
+}
+
+.container{
+  width:100%;
+  max-width:600px;
+  background:#1a1a1a;
+  padding:30px;
+  border-radius:20px;
+}
+
+h1{
+  text-align:center;
+  margin-bottom:15px;
+}
+
+p{
+  text-align:center;
+  color:#aaa;
+  margin-bottom:20px;
+}
+
+label{
+  display:block;
+  margin-bottom:10px;
+  margin-top:15px;
+  font-weight:bold;
+}
+
+input[type="number"],
+input[type="range"]{
+  width:100%;
+}
+
+input[type="file"]{
+  width:100%;
+  margin-top:15px;
+  background:#222;
+  color:white;
+  padding:10px;
+  border-radius:10px;
+}
+
+button{
+  width:100%;
+  padding:14px;
+  margin-top:20px;
+  background:#00c853;
+  border:none;
+  color:white;
+  font-size:18px;
+  border-radius:12px;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#00a844;
+}
+
+.progress-box{
+  margin-top:20px;
+}
+
+.progress-bar{
+  width:100%;
+  height:20px;
+  background:#333;
+  border-radius:20px;
+  overflow:hidden;
+  margin-top:8px;
+}
+
+#uploadBar,
+#downloadBar{
+  width:0%;
+  height:100%;
+  background:#00e676;
+  transition:0.2s;
+}
+
+img{
+  width:100%;
+  margin-top:25px;
+  border-radius:15px;
+  display:none;
+}
+
+.download-btn{
+  display:none;
+  text-align:center;
+  margin-top:20px;
+  background:#2962ff;
+  padding:14px;
+  border-radius:12px;
+  text-decoration:none;
+  color:white;
+  font-weight:bold;
+}
+
+.size-info{
+  margin-top:15px;
+  text-align:center;
+  color:#00e676;
+  line-height:1.8;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>PhotoCompressor</h1>
+<p>Compress images online for free.</p>
+
+<label>Image Width (px)</label>
+<input type="number" id="widthInput" value="1000">
+
+<label>Target File Size (KB)</label>
+<input type="number" id="targetSize" value="200">
+
+<label>Compression Quality</label>
+<input type="range" id="qualityInput" min="10" max="100" value="60">
+
+<div class="size-info" id="qualityInfo">
+Compression Quality: 60%
+</div>
+
+<input type="file" id="imageInput" accept="image/*">
+
+<button id="compressBtn">Compress Image</button>
+
+<div class="progress-box">
+<div id="uploadText">Upload Progress: 0%</div>
+<div class="progress-bar">
+<div id="uploadBar"></div>
+</div>
+</div>
+
+<div class="progress-box">
+<div id="downloadText">Download Progress: 0%</div>
+<div class="progress-bar">
+<div id="downloadBar"></div>
+</div>
+</div>
+
+<div class="size-info" id="sizeInfo"></div>
+
+<img id="preview">
+
+<a id="downloadBtn" class="download-btn" href="#">
+Download Compressed Image
+</a>
+
+</div>
+
+<script>
+
+const qualityInput = document.getElementById('qualityInput');
+const qualityInfo = document.getElementById('qualityInfo');
+const compressBtn = document.getElementById('compressBtn');
+
+qualityInput.addEventListener('input', () => {
+  qualityInfo.innerHTML = `Compression Quality: ${qualityInput.value}%`;
+});
+
+compressBtn.addEventListener('click', compressImage);
+
+function compressImage(){
+
+  const fileInput = document.getElementById('imageInput');
+  const file = fileInput.files[0];
+
+  if(!file){
+    alert('Please select an image');
+    return;
+  }
+
+  const width = parseInt(document.getElementById('widthInput').value);
+  let quality = parseInt(document.getElementById('qualityInput').value) / 100;
+  const targetSize = parseInt(document.getElementById('targetSize').value);
+
+  const reader = new FileReader();
+
+  reader.onprogress = function(event){
+
+    if(event.lengthComputable){
+
+      const percent = Math.round((event.loaded / event.total) * 100);
+
+      document.getElementById('uploadText').innerHTML =
+      `Upload Progress: ${percent}%`;
+
+      document.getElementById('uploadBar').style.width = percent + '%';
+    }
+  };
+
+  reader.onload = function(event){
+
+    const img = new Image();
+
+    img.onload = function(){
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const scale = width / img.width;
+
+      canvas.width = width;
+      canvas.height = img.height * scale;
+
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+
+      function tryCompress(){
+
+        canvas.toBlob(function(blob){
+
+          if(!blob){
+            alert('Compression failed');
+            return;
+          }
+
+          const compressedURL = URL.createObjectURL(blob);
+
+          const preview = document.getElementById('preview');
+          preview.src = compressedURL;
+          preview.style.display = 'block';
+
+          const originalSize = (file.size / 1024).toFixed(2);
+          const compressedSize = (blob.size / 1024).toFixed(2);
+          const savedSize = (originalSize - compressedSize).toFixed(2);
+
+          document.getElementById('sizeInfo').innerHTML = `
+          Original Size: ${originalSize} KB <br>
+          Compressed Size: ${compressedSize} KB <br>
+          Saved Size: ${savedSize} KB
+          `;
+
+          if(blob.size / 1024 > targetSize && quality > 0.1){
+            quality -= 0.05;
+            tryCompress();
+            return;
+          }
+
+          const downloadBtn = document.getElementById('downloadBtn');
+
+          downloadBtn.style.display = 'block';
+
+          downloadBtn.onclick = function(){
+
+            let progress = 0;
+
+            const interval = setInterval(() => {
+
+              progress += 10;
+
+              document.getElementById('downloadText').innerHTML =
+              `Download Progress: ${progress}%`;
+
+              document.getElementById('downloadBar').style.width =
+              progress + '%';
+
+              if(progress >= 100){
+
+                clearInterval(interval);
+
+                const a = document.createElement('a');
+                a.href = compressedURL;
+                a.download = 'compressed-image.jpg';
+
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }
+
+            },100);
+          };
+
+        }, 'image/jpeg', quality);
+      }
+
+      tryCompress();
+    };
+
+    img.src = event.target.result;
+  };
+
+  reader.readAsDataURL(file);
+}
+
+</script>
+
+</body>
+</html>
